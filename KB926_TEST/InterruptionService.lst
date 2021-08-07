@@ -1,0 +1,142 @@
+C51 COMPILER V9.52.0.0   INTERRUPTIONSERVICE                                               12/29/2016 22:33:17 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE INTERRUPTIONSERVICE
+OBJECT MODULE PLACED IN .\OBJ\InterruptionService.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE CSP\InterruptionService.c LARGE BROWSE INCDIR(.\BSP;.\CSP;.\USER) DEBUG OBJ
+                    -ECTEXTEND PRINT(.\InterruptionService.lst) OBJECT(.\OBJ\InterruptionService.obj)
+
+line level    source
+
+   1          
+   2          #include "KB926.H"
+   3          #include "User.h"
+   4                                                   
+   5          /***********************************************************************************
+   6                  串口中断服务声明
+   7          ***********************************************************************************/
+   8          void ComInterruptionService(void) interrupt 4
+   9          {
+  10   1              if(TI==1)                                               //      发送中断
+  11   1              {
+  12   2                      TI=0;
+  13   2              }
+  14   1      
+  15   1              if(RI==1)                                               //      接收中断
+  16   1              {
+  17   2                      RI=0;
+  18   2                      SEND_ONE_BYTE(SBUF);
+  19   2              }
+  20   1      }
+  21          
+  22                                                            
+  23          /***********************************************************************************
+  24                  定时计数器0中断服务声明
+  25          ***********************************************************************************/
+  26          void TimerCount0InterruptionService(void) interrupt 1
+  27          {
+  28   1              //--------------------------------------------------------------
+  29   1              //      定义用户变量等
+  30   1              static unsigned int cp_status = 0;                      //      状态机状态代码
+  31   1              unsigned int CP = 0;                                            //      状态机计数
+  32   1              static unsigned int count = 0;                          //      分频计数器
+  33   1              
+  34   1              //--------------------------------------------------------------
+  35   1              if(TF0==1)                                              //      定时计数器0溢出中断
+  36   1              {                                                                                                                                                       
+  37   2                      TH0 = (unsigned char)((TIMER_COUNT_VALUE/0x100)&0x0FF);                         //      装载计数值       
+  38   2                      TL0 = (unsigned char)(TIMER_COUNT_VALUE&0x0FF);                                         //      装载计数值
+  39   2                      TF0=0;                                          //      清空中断标志   
+  40   2      
+  41   2                      //--------------------------------------------
+  42   2                      //      分频处理
+  43   2                      ++count;                                //      累计
+  44   2                      //      大于10表示已经走完10次了
+  45   2                      if(count > 10)
+  46   2                      {
+  47   3                              count = 0;
+  48   3                      }
+  49   2                      else
+  50   2                      {
+  51   3                              return ;
+  52   3                      }
+  53   2                      
+  54   2                      //--------------------------------------------
+C51 COMPILER V9.52.0.0   INTERRUPTIONSERVICE                                               12/29/2016 22:33:17 PAGE 2   
+
+  55   2                      //      LED闪灯状态机
+  56   2                      CP = 0;
+  57   2                      //----------------------------------0
+  58   2                      if(cp_status == CP++)
+  59   2                      {
+  60   3                              GPIOOUT.GPIOA15_8 = 0x01;
+  61   3                              ++cp_status;                    
+  62   3                      }
+  63   2                      //----------------------------------1
+  64   2                      else if(cp_status == CP++)
+  65   2                      {
+  66   3                              GPIOOUT.GPIOA15_8 = 0x02;                       
+  67   3                              ++cp_status;                    
+  68   3                      }               
+  69   2                      //----------------------------------2
+  70   2                      else if(cp_status == CP++)
+  71   2                      {                                  
+  72   3                              GPIOOUT.GPIOA15_8 = 0x04;                       
+  73   3                              ++cp_status;                            
+  74   3                      }
+  75   2                      //----------------------------------3
+  76   2                      else if(cp_status == CP++)
+  77   2                      {                                                          
+  78   3                              GPIOOUT.GPIOA15_8 = 0x08;               
+  79   3                              ++cp_status;                            
+  80   3                      }
+  81   2                      //----------------------------------4
+  82   2                      else if(cp_status == CP++)
+  83   2                      {                                                                                                  
+  84   3                              GPIOOUT.GPIOA15_8 = 0x04;               
+  85   3                              ++cp_status;                                    
+  86   3                      }
+  87   2                      //----------------------------------5
+  88   2                      else if(cp_status == CP++)
+  89   2                      {                                                                                                          
+  90   3                              GPIOOUT.GPIOA15_8 = 0x02;               
+  91   3                              cp_status = 0;                  
+  92   3                      }
+  93   2                      //----------------------------------非法状态
+  94   2                      else
+  95   2                      {
+  96   3                              cp_status = 0;
+  97   3                              CP = 0;
+  98   3                      }
+  99   2                                      
+ 100   2                      //GPIOOUT.GPIOA15_8 = ~GPIOOUT.GPIOA15_8;
+ 101   2              }
+ 102   1      }
+ 103                   
+ 104          /***********************************************************************************
+ 105                  ADC中断服务声明
+ 106          ***********************************************************************************/
+ 107          void ADCInterruptionService(void) interrupt 28
+ 108          {
+ 109   1              //      清楚ADC中断标志
+ 110   1              P3IF7 = 0;
+ 111   1              GPIOOUT.GPIOA15_8 = 0x0F;
+ 112   1              ADC_FLAG = 1;
+ 113   1      }
+ 114          
+
+
+C51 COMPILER V9.52.0.0   INTERRUPTIONSERVICE                                               12/29/2016 22:33:17 PAGE 3   
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    450    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =      4    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

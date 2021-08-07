@@ -1,0 +1,253 @@
+C51 COMPILER V9.52.0.0   MAIN                                                              12/29/2016 22:33:18 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN .\OBJ\main.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE USER\main.c LARGE BROWSE INCDIR(.\BSP;.\CSP;.\USER) DEBUG OBJECTEXTEND PRIN
+                    -T(.\main.lst) OBJECT(.\OBJ\main.obj)
+
+line level    source
+
+   1          #include "KB926.H"              
+   2          #include "User.h"
+   3          #include <stdio.h>
+   4          #include <string.h>
+   5          
+   6          #define DELAY_TIME              100      
+   7          #define F_DPLL                  32768000L
+   8          
+   9          #define KEY1_STATUS             ((GPIOIN.GPIOA7_0|(~0x80))==(~0x80))
+  10          #define KEY2_STATUS             ((GPIOIN.GPIOA7_0|(~0x40))==(~0x40))
+  11          #define KEY3_STATUS             ((GPIOIN.GPIOA7_0|(~0x20))==(~0x20))
+  12          #define KEY4_STATUS             ((GPIOIN.GPIOA7_0|(~0x10))==(~0x10))
+  13          
+  14          
+  15          unsigned int ADC_FLAG = 0;
+  16          unsigned int adc_val = 0;
+  17          
+  18          
+  19          void SoftwaveDelay(unsigned int in)
+  20          {
+  21   1              unsigned int i,j;
+  22   1              for(i=0;i<in;i++)
+  23   1              {
+  24   2                      for(j=0;j<327;j++)
+  25   2                      {
+  26   3                      }
+  27   2              }
+  28   1      }
+  29          
+  30          int main()
+  31          {                       
+  32   1              char str[100];// _at_ 0xF400;
+  33   1              unsigned int add = 0x1234;// = &str;
+  34   1              STRUCT16BIT aa;                                    
+  35   1      
+  36   1      //      PCON2 |= 1<<4;                                                  //      允许访问片内模块
+  37   1      //      PCON2 &= ~(1<<3);                                               //      清空中断标志     
+  38   1      //      XBICS |= 1<<3;                                                  //      使能XRAM
+  39   1      //      ECMISC |= 1<<7;                                                 //      8051 state set as Normal state
+  40   1      
+  41   1      
+  42   1              aa.WORD = 0x1234;
+  43   1              //add = &str;
+  44   1      //      unsigned int tmp = (unsigned int)((F_DPLL/115200)-1);
+  45   1              
+  46   1                       
+  47   1      
+  48   1      
+  49   1              CLKCFG |= 1<<6;                                                 //      Flash时钟设定为全速模式
+  50   1              CLKCFG |= 3<<2;                                                 //      设定8051时钟和外围设备的时钟为最高速度
+  51   1              CLKCFG |= 1<<5;                                                 //      使能DPLL的参数设定
+  52   1              
+  53   1              //      设定DPLL为0x3E8(1000)倍频
+  54   1              PLLFRH = 0x3E;
+C51 COMPILER V9.52.0.0   MAIN                                                              12/29/2016 22:33:18 PAGE 2   
+
+  55   1              PLLFRL &= 0x0F;
+  56   1              PLLFRL |= 0x80;
+  57   1      
+  58   1              ComInit(115200L,F_DPLL);
+  59   1              
+  60   1              //      设置默认的输出状态
+  61   1              GPIOOUT.GPIOA7_0 = 0X00;                                        //      默认输出为低电平
+  62   1      
+  63   1              //GPIOFS.GPIOA15_8 = 0x00;                              //      设置GPIO0.0为通用IO
+  64   1              //GPIOFS.GPIOA7_0 = 0x00;                               //      设置GPIO0.0为通用IO
+  65   1              GPIOOE.GPIOA15_8 = 0x0F;                                //      使能GPIOA的11~8为输出 
+  66   1              //GPIOOE.GPIOA7_0 = (1<<0)|(1<<2);              //      使能GPIOA的0、2为输出           为测试示波器的数字电位器用的
+  67   1              GPIOIE.GPIOA7_0 = 0xF0;                                 //      使能GPIOA的7~4为输入
+  68   1      
+  69   1              //Timer0_16bitInit(0xFFFF-1000+1);              //      输出定时器输入时钟的1000分频  
+  70   1              //Timer0_16bitInit((unsigned int)(65536L - (F_DPLL*0.001)/12L));                //      500ms
+  71   1              Timer0_16bitInit(0);            //      500ms
+  72   1              
+  73   1              //--------------------------------------------------
+  74   1              //      输出测试
+  75   1              GPIOOUT.GPIOA7_0 &= ~(1<<0);
+  76   1              GPIOOUT.GPIOA7_0 &= ~(1<<2);
+  77   1              //GPIOOUT.GPIOA7_0 |= (1<<0);
+  78   1              //GPIOOUT.GPIOA7_0 |= (1<<2);
+  79   1              
+  80   1              //--------------------------------------------------
+  81   1              //      ADC初始化测试
+  82   1              //      硬件连接为GPIO38/AD0连接到电位器，输入范围0.1*AVCC到0.9*AVCC
+  83   1              GPIOIE.GPIO3.WORD = 0x0000;
+  84   1              ADDAEN |= 1<<0;
+  85   1              P3IF7 = 0;
+  86   1              //P3IE7 = 1;    //      使能ADC中断     
+  87   1              //EA = 1;
+  88   1              ADCTRL = 1;                     
+  89   1      
+  90   1              while(1)
+  91   1              {
+  92   2      //              GPIOOUT.GPIOA15_8 = 0x01;                       
+  93   2      //              SoftwaveDelay(DELAY_TIME);                                                         
+  94   2      //              GPIOOUT.GPIOA15_8 = 0x02;               
+  95   2      //              SoftwaveDelay(DELAY_TIME);                                                         
+  96   2      //              GPIOOUT.GPIOA15_8 = 0x04;               
+  97   2      //              SoftwaveDelay(DELAY_TIME);                                                         
+  98   2      //              GPIOOUT.GPIOA15_8 = 0x08;               
+  99   2      //              SoftwaveDelay(DELAY_TIME);                                                                 
+ 100   2      //              GPIOOUT.GPIOA15_8 = 0x04;               
+ 101   2      //              SoftwaveDelay(DELAY_TIME);                                                                 
+ 102   2      //              GPIOOUT.GPIOA15_8 = 0x02;               
+ 103   2      //              SoftwaveDelay(DELAY_TIME);
+ 104   2                                       
+ 105   2              //      SEND_ONE_BYTE(0x5A);
+ 106   2              //      SEND_ONE_BYTE(*(((unsigned char *)(&tmp))+0));             
+ 107   2              //      SEND_ONE_BYTE(*(((unsigned char *)(&tmp))+1));
+ 108   2              //      SEND_ONE_BYTE(0xA5);      
+ 109   2      //              SEND_ONE_BYTE('N');
+ 110   2      //              SEND_ONE_BYTE('R');       
+ 111   2      //              SEND_ONE_BYTE('Y');     
+ 112   2      //              SEND_ONE_BYTE('\r');
+ 113   2      //              SEND_ONE_BYTE('\n');
+ 114   2      //              memset(str,0,sizeof(str));
+ 115   2      //              sprintf(str,"ADD = 0x%04X\r\n",add);
+ 116   2                      //sprintf(str,"aa.WORD=0x%04X, aa.BYTE[0]=0x%02X,aa.BYTE[1]=0x%02X\r\n",aa.WORD,(unsigned int)aa.BYTE[0]
+C51 COMPILER V9.52.0.0   MAIN                                                              12/29/2016 22:33:18 PAGE 3   
+
+             -,(unsigned int)aa.BYTE[1]);
+ 117   2      //              SendString(str);                
+ 118   2      //              SoftwaveDelay(1000);       
+ 119   2      
+ 120   2      //              aa = (GPIOIN.GPIOA7_0&0xF0)>>4;
+ 121   2      //              GPIOOUT.GPIOA15_8 = aa;
+ 122   2                      
+ 123   2      //              if(RI == 1)
+ 124   2      //              {
+ 125   2      //                      RI = 0;
+ 126   2      //                      SEND_ONE_BYTE(SBUF);
+ 127   2      //                      GPIOOUT.GPIOA15_8 = ~GPIOOUT.GPIOA15_8;
+ 128   2      //              }
+ 129   2      
+ 130   2      //              if(tmp == 0x11B) GPIOOUT.GPIOA15_8 = 0x0F;
+ 131   2      //              else GPIOOUT.GPIOA15_8 = 0x00;
+ 132   2      
+ 133   2              //------------------------------------------------------
+ 134   2              //      按键功能测试
+ 135   2              #define DELAY_VALUE             10
+ 136   2              if(KEY1_STATUS)
+ 137   2              {
+ 138   3                      SoftwaveDelay(50);                                                      //      前沿消抖
+ 139   3                      sprintf(str,"KEY1 UpDown!\r\n");
+ 140   3                      SendString(str);
+ 141   3                      
+ 142   3                      //      数字电位器模拟  
+ 143   3                      GPIOOUT.GPIOA7_0 |= (1<<0);
+ 144   3                      SoftwaveDelay(DELAY_VALUE);                     
+ 145   3                      GPIOOUT.GPIOA7_0 |= (1<<2);     
+ 146   3                      SoftwaveDelay(DELAY_VALUE);                     
+ 147   3                      GPIOOUT.GPIOA7_0 &= ~(1<<0);
+ 148   3                      SoftwaveDelay(DELAY_VALUE);                     
+ 149   3                      GPIOOUT.GPIOA7_0 &= ~(1<<2);
+ 150   3                      SoftwaveDelay(DELAY_VALUE);             
+ 151   3                      
+ 152   3                      while(KEY1_STATUS) ;                                            //      等待按键释放
+ 153   3                      SoftwaveDelay(50);                                                      //      后沿消抖
+ 154   3                              
+ 155   3              }
+ 156   2              if(KEY2_STATUS)
+ 157   2              {
+ 158   3                      SoftwaveDelay(50);                                                      //      前沿消抖
+ 159   3                      sprintf(str,"KEY2 UpDown!\r\n");
+ 160   3                      SendString(str);
+ 161   3                      
+ 162   3                      //      数字电位器模拟  
+ 163   3                      GPIOOUT.GPIOA7_0 |= (1<<2);
+ 164   3                      SoftwaveDelay(DELAY_VALUE);                     
+ 165   3                      GPIOOUT.GPIOA7_0 |= (1<<0);     
+ 166   3                      SoftwaveDelay(DELAY_VALUE);                     
+ 167   3                      GPIOOUT.GPIOA7_0 &= ~(1<<2);
+ 168   3                      SoftwaveDelay(DELAY_VALUE);                     
+ 169   3                      GPIOOUT.GPIOA7_0 &= ~(1<<0);
+ 170   3                      SoftwaveDelay(DELAY_VALUE);     
+ 171   3                      
+ 172   3                      while(KEY2_STATUS) ;                                            //      等待按键释放
+ 173   3                      SoftwaveDelay(50);                                                      //      后沿消抖
+ 174   3                      
+ 175   3              }
+ 176   2              if(KEY3_STATUS)
+ 177   2              {
+C51 COMPILER V9.52.0.0   MAIN                                                              12/29/2016 22:33:18 PAGE 4   
+
+ 178   3                      SoftwaveDelay(50);                                                      //      前沿消抖
+ 179   3                      sprintf(str,"KEY3 UpDown!\r\n");
+ 180   3                      SendString(str);
+ 181   3                      while(KEY3_STATUS) ;                                            //      等待按键释放
+ 182   3                      SoftwaveDelay(50);                                                      //      后沿消抖
+ 183   3              }
+ 184   2              if(KEY4_STATUS)
+ 185   2              {
+ 186   3                      SoftwaveDelay(50);                                                      //      前沿消抖
+ 187   3                      sprintf(str,"KEY4 UpDown!\r\n");
+ 188   3                      SendString(str);
+ 189   3                      while(KEY4_STATUS) ;                                            //      等待按键释放
+ 190   3                      SoftwaveDelay(50);                                                      //      后沿消抖
+ 191   3              }
+ 192   2              
+ 193   2              
+ 194   2              //------------------------------------------------------
+ 195   2              //      循环延时
+ 196   2              SoftwaveDelay(100);     
+ 197   2              
+ 198   2              
+ 199   2              //GPIOIE.GPIO3.WORD = 1<<8;
+ 200   2              //ADDAEN |= 1<<0;
+ 201   2              
+ 202   2              //      采用查询方式使用ADC
+ 203   2              ADCTRL = 1;
+ 204   2              SoftwaveDelay(100);     
+ 205   2              adc_val = (ADCDAT*4)+ ((ECIF>>6)&0x03);
+ 206   2              sprintf(str,"val = 0x%04X\r\n",adc_val);
+ 207   2              SendString(str);
+ 208   2              
+ 209   2              //      采用中断方式使用ADC
+ 210   2              //      检查ADC标志
+ 211   2              if(ADC_FLAG == 1)
+ 212   2              {
+ 213   3                      SendString("ADC Interruption! ");
+ 214   3                      adc_val = (ADCDAT*4)+ ((ECIF>>6)&0x03);
+ 215   3                      sprintf(str,"val = 0x%04X\r\n",adc_val);
+ 216   3                      SendString(str);
+ 217   3                      ADC_FLAG = 0;
+ 218   3                      ADCTRL = 1;
+ 219   3              }
+ 220   2      
+ 221   2              }
+ 222   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    696    ----
+   CONSTANT SIZE    =     94    ----
+   XDATA SIZE       =      4     104
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

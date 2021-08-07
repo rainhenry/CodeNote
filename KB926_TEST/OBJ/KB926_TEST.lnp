@@ -1,0 +1,6 @@
+".\OBJ\KB926.obj",
+".\OBJ\InterruptionService.obj",
+".\OBJ\startup.obj",
+".\OBJ\main.obj" 
+TO ".\OBJ\KB926_TEST" 
+PRINT(".\KB926_TEST.m51") XDATA( 0XF400-0XFBFF )

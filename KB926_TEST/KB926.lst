@@ -1,0 +1,140 @@
+C51 COMPILER V9.52.0.0   KB926                                                             12/29/2016 22:33:17 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE KB926
+OBJECT MODULE PLACED IN .\OBJ\KB926.obj
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE CSP\KB926.c LARGE BROWSE INCDIR(.\BSP;.\CSP;.\USER) DEBUG OBJECTEXTEND PRIN
+                    -T(.\KB926.lst) OBJECT(.\OBJ\KB926.obj)
+
+line level    source
+
+   1          
+   2          #include "KB926.H"
+   3                                                   
+   4          /***********************************************************************************
+   5                  GPIO寄存器相关声明
+   6          ***********************************************************************************/
+   7          GPIO_S_TypeDef xdata GPIOFS _at_ GPIOFS_BASE;                                   //      定义GPIO的功能选择寄存器组 
+   8          GPIO_A_TypeDef xdata GPIOOE _at_ GPIOOE_BASE;                                   //      定义GPIO的输出使能寄存器组  
+   9          GPIO_A_TypeDef xdata GPIOOUT _at_ GPIOOUT_BASE;                                 //      定义GPIO的输出数据寄存器组
+  10          GPIO_A_TypeDef xdata GPIOIN _at_ GPIOIN_BASE;                           //      定义GPIO的输入数据寄存器组 
+  11          GPIO_S_TypeDef xdata GPIOPU _at_ GPIOPU_BASE;                                   //      定义GPIO的上拉使能寄存器组
+  12          GPIO_S_TypeDef xdata GPIOOD _at_ GPIOOD_BASE;                                   //      定义GPIO的漏极开路使能寄存器组 
+  13          GPIO_A_TypeDef xdata GPIOIE _at_ GPIOIE_BASE;                                   //      定义GPIO的输入使能寄存器组      
+  14          unsigned char xdata GPIO_MISC _at_ GPIO_MISC_BASE;                          //  定义GPIO杂项控制寄存器           
+  15                                                                                                                                                                                           
+  16          /***********************************************************************************
+  17                  时钟寄存器相关声明
+  18          ***********************************************************************************/
+  19          unsigned char xdata CLKCFG _at_ 0xFF0D;                                                 //      定义EC时钟配置寄存器   
+  20          unsigned char xdata PLLFRH _at_ 0xFF16;                                                 //      定义EC PLL频率配置高字节寄存器 
+  21          unsigned char xdata PLLFRL _at_ 0xFF17;                                                 //      定义EC PLL频率配置高字节寄存器
+  22          
+  23          /***********************************************************************************
+  24                  串口操作相关声明
+  25          ***********************************************************************************/
+  26          void ComInit(unsigned long baud,unsigned long dpll)                                             //      初始化串口，参数baud为波特率，参数dpll为芯片DP
+             -LL时钟频率（Hz单位）
+  27          {       
+  28   1              unsigned long tmp = (dpll/baud)-1;
+  29   1              //      设置相关IO口            
+  30   1              GPIOFS.GPIO1.BYTE[0] |= 1<<6;                           //      设定GPIO16 TXD为其他功能输出    
+  31   1              GPIOOE.GPIO1.BYTE[0] |= 1<<6;                           //      使能GPIO16 TXD输出              
+  32   1              GPIOIE.GPIO1.BYTE[0] |= 1<<7;                           //      使能GPIO17 RXD输入      
+  33   1              GPIOPU.GPIO1.BYTE[0] |= 1<<7;                           //      使能位上拉输入          
+  34   1              
+  35   1              //      配置串口工作方式
+  36   1              SCON &= ~(1<<7);                                                        //      设定工作方式为8位异步串口
+  37   1              SCON |= 1<<6;                                                           //      设定工作方式为8位异步串口
+  38   1              SCON |= 1<<4;                                                           //      使能接收
+  39   1      
+  40   1              //      计算波特率
+  41   1              SCON2 = (unsigned char)((tmp/0x100)&0x0FF);
+  42   1              SCON3 = (unsigned char)(tmp%0x100);     
+  43   1      
+  44   1              ES = 1;                                                                         //      开启串口中断
+  45   1              EA = 1;                                                                         //      开启总中断
+  46   1      }
+  47                  
+  48          void SEND_ONE_BYTE(unsigned char in)                                                                    //      发送一个字节，独占CPU的方式
+  49          {                                                 
+  50   1              SBUF = in;                                                                                                                      //      发送数据
+  51   1              while(TI==0) ;                                                                                                          //      等待发送完成(有TI事件产生)
+  52   1              TI=0;                                                                                                                           //      清除事件标志
+  53   1      }
+C51 COMPILER V9.52.0.0   KB926                                                             12/29/2016 22:33:17 PAGE 2   
+
+  54          
+  55          void SendString(char *p)                                                                                                //      发送一个字符串
+  56          {
+  57   1              unsigned int i =0;
+  58   1              while(*(p+i) != '\0')
+  59   1              {
+  60   2                      SEND_ONE_BYTE(*(p+i));
+  61   2                      i++;
+  62   2              }
+  63   1      }        
+  64          
+  65          
+  66          /***********************************************************************************
+  67                  定时计数器相关声明
+  68                  注意，进入定时器的时钟频率为DPLL的12分频 
+  69                  装载值为溢出率，即定时器是不断自加的
+  70          ***********************************************************************************/
+  71          unsigned int TIMER_COUNT_VALUE;                                                                                 //      当作为定时器的时候，用于重新装载。
+  72          void Timer0_16bitInit(unsigned int ARR)                                                                 //      作为16位定时器初始化
+  73          {
+  74   1              TIMER_COUNT_VALUE = ARR;                                        //      设置装载值
+  75   1              TMOD &= ~(1<<1);                                                        //      设定为16位定模式  
+  76   1              TMOD |= 1<<0;                                                           //      设定为16位定模式   
+  77   1              TMOD &= ~(1<<2);                                                        //      设定为定时模式     
+  78   1              TMOD &= ~(1<<3);                                                        //      不需要INIT0#的参与即可使能工作
+  79   1              TH0 = (unsigned char)((TIMER_COUNT_VALUE/0x100)&0x0FF);                         //      装载计数值       
+  80   1              TL0 = (unsigned char)(TIMER_COUNT_VALUE&0x0FF);                                         //      装载计数值
+  81   1              ET0 = 1;                                                                        //      使能定时器0中断
+  82   1              EA = 1;                                                                         //      开总中断                                 
+  83   1              TR0 = 1;                                                                        //      启动定时器0
+  84   1      }
+  85          
+  86          
+  87          /***********************************************************************************
+  88                  X-Bus 接口相关声明                                                                                                                              SPICMD                  
+  89          ***********************************************************************************/    
+  90          unsigned char xdata XBICS _at_ 0xFEA6;                                                                  //      XBI E51CS# Configuration         
+  91          unsigned char xdata SPIA0 _at_ 0xFEA8;                                                                  //      XBI SPI Flash Address (22-bit) = [SPIA2(6bit) : SPIA1(8
+             -bit) : SPIA0(8bit)]   
+  92          unsigned char xdata SPIA1 _at_ 0xFEA9;                                                                  //      XBI SPI Flash Address (22-bit) = [SPIA2(6bit) : SPIA1(8
+             -bit) : SPIA0(8bit)]
+  93          unsigned char xdata SPIA2 _at_ 0xFEAA;                                                                  //      XBI SPI Flash Address (22-bit) = [SPIA2(6bit) : SPIA1(8
+             -bit) : SPIA0(8bit)]
+  94          unsigned char xdata SPIDAT _at_ 0xFEAB;                                                                 //      XBI SPI Flash Output/Input Data Port                                                                       
+  95          unsigned char xdata SPICMD _at_ 0xFEAC;                                                                 //      XBI SPI Flash Command Port
+  96          
+  97          
+  98          unsigned char xdata ECMISC _at_ 0xFF20;
+  99          
+ 100          
+ 101          /***********************************************************************************
+ 102                  ADC 接口相关声明                                                                                                                                        
+ 103          ***********************************************************************************/    
+ 104          //-------------------ADC相关寄存器----------------------                                                                                                
+ 105          unsigned char xdata ADDAEN              _at_    0xFF15;                                 //                                              
+ 106          unsigned char xdata ADCTRL              _at_    0xFF18;                                 //                              
+ 107          unsigned char xdata ADCDAT              _at_    0xFF19;                                 //                      
+ 108          unsigned char xdata ECIF                _at_    0xFF1A;                                 //      
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    219    ----
+C51 COMPILER V9.52.0.0   KB926                                                             12/29/2016 22:33:17 PAGE 3   
+
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =      2      15
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
